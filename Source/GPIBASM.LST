@@ -1,0 +1,556 @@
+GPIBASM                                                                                                       PAGE 1
+
+                       1    $MOD52  
+                       2    
+                       3    
+  0080                 4    gpdata   equ   p0  ;---------------------------------------
+  0090                 5    outdata  equ   p1  ;
+                       6    
+  00A0                 7    renpin   equ   p2.0;
+  00A1                 8    ifc      equ   p2.1;
+  00A2                 9    ndac     equ   p2.2;
+  00A3                10    nrfd     equ   p2.3;
+  00A4                11    dav      equ   p2.4;
+  00A5                12    eoi      equ   p2.5;
+  00A6                13    atn      equ   p2.6;            Portlar tanýmlanýr
+  00A7                14    srq      equ   p2.7;
+                      15    
+  00B7                16    te161    equ    p3.7;
+  00B6                17    dc161    equ    p3.6;
+  00B5                18    dr160    equ    p3.5;
+  00B4                19    e160     equ    p3.4;
+  00B3                20    FA       equ    p3.3; ac dc off butonlarý için
+  00B2                21    FB       equ    p3.2; ac dc off butonlarý için
+  00B1                22    otoman   equ    p3.1; otomatik manuel anahtarý
+  00B0                23    gcdata   equ    p3.0; ilk çalýlýþta 74578 i seçmek için kullanýlýr
+                      24                        ;--------------------------------------
+                      25    
+                      26    
+                      27    
+  0060                28    commbuf  equ   60h ; ro dizisini 60h adresinden itibaren sakla
+                      29    
+                      30    
+  0008                31    ismyadd   equ  8     ; eðer adres doðruysa bu bit 1 olur
+  0009                32    acmidcmi  equ  9     ; bu bit TOAC! komutu doðrulanýrsa 1 olur TODC! komutu doðrulanýrsa 0 o
+                                                                               lur
+                      33                         ;------------------------------------
+  000E                34    acbit     equ  14       
+  000F                35    dcbit     equ  15
+  0010                36    offbit    equ  16    ; ac dc off döngülerine bir sefer girmek için kullanýlýr 
+  0011                37    otokont   equ  17    
+  0012                38    otokont1  equ  18
+                      39    
+                      40                         ;----------------------------------
+  003F                41    unl      equ   3fh ;
+  002A                42    myadress equ   42  ; 10 OR 32
+                      43    
+                      44    
+                      45    
+                      46    
+                      47    
+0000                  48    org 0000h     ;---------------------------------
+                      49    
+0000 020200           50    jmp startx    ; 0h ve 200h arasýndaki adresleri boþ býrak programý 200h adresinden sonra kay
+                                                                               det bu araya r0 dizisi kaydedilicek
+                      51    
+0200                  52    org 0200h     ;--------------------------------
+0200                  53    startx:
+0200 1202C2           54    lcall setlistener     ;
+0203 7860             55    mov r0, #commbuf      ; r0'ý 60h adresine konumlandýr
+                      56    
+GPIBASM                                                                                                       PAGE 2
+
+                      57    
+0205 C211             58    clr otokont
+0207 C210             59    clr offbit ;-------------------
+0209 C20F             60    clr dcbit  ; bu bitler güvenlik için sýfýrlanýr programýn hiç bi alt programa girmediðin gös
+                                                                               terir
+020B C20E             61    clr acbit  ;-------------------
+020D 120424           62    lcall bekle1
+0210 D290             63    setb outdata
+0212 1203A9           64    lcall manoff   
+0215 C2B0             65    clr gcdata       ; adresi okumak için birinci 74578 i çalýþtýr
+0217 120424           66    lcall bekle1
+021A E580             67    mov a, gpdata    ; datayý al
+021C F52A             68    mov myadress,a  ;
+021E D2B0             69    setb gcdata      ; datalarý okumak için ikinci 74578 i çalýþtýr
+                      70    
+                      71    
+                      72    
+                      73    
+0220                  74    roletak1:
+0220 C210             75    clr offbit ;
+0222 C20F             76    clr dcbit  ;
+0224 C20E             77    clr acbit  ;
+0226 D211             78    setb otokont
+                      79    
+0228                  80    roletak:    
+0228 309320           81    jnb p1.3,main
+022B 12042D           82    lcall bekle
+022E 12042D           83    lcall bekle
+0231 C295             84    clr p1.5
+0233 C296             85    clr p1.6        ; role tak prosedürünü çalýþtýr eðer role takýlýrsa roletak1 e git roleleri 
+                                                                               off yap ana programa dön
+0235 C297             86    clr p1.7
+0237 12042D           87    lcall bekle
+023A 12042D           88    lcall bekle
+023D D295             89    setb p1.5
+023F D296             90    setb p1.6
+0241 D297             91    setb p1.7
+0243 12042D           92    lcall bekle
+0246 12042D           93    lcall bekle
+0249 80DD             94    jmp roletak
+                      95    
+                      96    
+                      97    
+                      98    
+024B                  99    main:
+024B 2093D2          100    jb p1.3,roletak1
+024E 20B11A          101    jb otoman, notmanuel     ; eðer manuelde deðilse bu manuel prosedürü geç
+                     102    
+                     103    
+0251 D211            104    setb otokont
+0253 20B209          105    jb FB,devam1
+0256 20B30C          106    jb FA,devam     
+0259 1203CE          107    lcall mandc
+025C 02027C          108    jmp notmanuel1
+025F                 109    devam1:
+025F 1203A9          110    lcall manoff
+0262 02027C          111    jmp notmanuel1 
+0265                 112    devam:
+GPIBASM                                                                                                       PAGE 3
+
+0265 1203F7          113    lcall manac
+0268 02027C          114    jmp notmanuel1
+                     115    
+                     116    
+026B                 117    notmanuel:
+026B 301105          118    jnb otokont,atlanotmanuel
+026E C211            119    clr otokont               ; manuelden remote geçerken bir keleðine roleleri off yap bilgisay
+                                                                               ardan komut beklemeye baþla
+0270 1203A9          120    lcall manoff
+0273                 121    atlanotmanuel:
+                     122    
+                     123    
+0273 30B106          124    jnb otoman, notmanuel1 ;----------------------------------
+0276 C20F            125    clr dcbit
+0278 C20E            126    clr acbit              ; bu bölgeye sadece otomatik modda girmeli
+027A C210            127    clr offbit
+027C                 128    notmanuel1:            ;----------------------------------
+                     129    
+                     130    
+027C 20A4CC          131    jb dav, main          ; eðer data yoldaysa oku
+027F C2A3            132    clr nrfd              ; not ready for data þuan meþgulüm sinyali
+0281 20A605          133    jb atn, main1         ; eðer atn 0 ise gelen data adres bilgisidir 1 ise gerçek data geliyor
+                                                                                demektir
+0284 1202A9          134    lcall itiscommand     ; adresi oku ve doðrula
+0287 80C2            135    jmp main;
+0289                 136    main1:
+0289 12028E          137    lcall itisdata        ;  datayý oku
+028C 80BD            138    jmp main;
+                     139    
+                     140    
+                     141    
+                     142    
+028E                 143    itisdata:
+028E 30B114          144    jnb otoman,dataalindi        ; eðer manueldeyse next1x'e atlayýp adres uymamýþ gibi göster
+0291 300811          145    jnb ismyadd,dataalindi       ; adres doðruysa datayý almaya baþla
+0294 E580            146    mov a, gpdata               ; datayý al
+0296 F4              147    cpl a                       ; gpib ters logic olduðu için gelen datayý ters çevir
+0297 F6              148    mov @r0, a                  ; datayý r0 inci adreste sakla
+0298 08              149    inc r0                      ; r0'ý bir arttýr yani bi sonraki adrese geç
+                     150    
+0299 B42109          151    cjne a, #'!', dataalindi     ; ! geldiðinde aldýðý datalarý karþýlaþtýrmaya git
+029C 1202E6          152    lcall komutlar              ;
+029F 7860            153    mov r0,#commbuf             ; tekrar dizinin baþlangýcana 60h adresinde git
+02A1 1202DC          154    lcall datataken             ; konuþmacýya data alýndý bilgisi gönder
+02A4 22              155    ret;
+                     156    
+02A5                 157    dataalindi:                  ;
+02A5 1202DC          158    lcall datataken             ; eðer hiç bir adres tutmazsa yinede data alýndý bilgisi gönderm
+                                                                               eliyiz paralel bi haberleþme olduðu için
+                                                                               
+02A8 22              159    ret;                        ;
+                     160    
+                     161    
+                     162    
+                     163    
+                     164    
+02A9                 165    itiscommand:
+02A9 E580            166    mov a, gpdata               ; datayý al
+GPIBASM                                                                                                       PAGE 4
+
+02AB F4              167    cpl a                       ; tersle
+02AC B52A06          168    cjne a,myadress , next1x   ; programýn baþlangýcýnda okunan adresle aynýysa devam et
+02AF D208            169    setb ismyadd                ; adres uyuyosa bu bit'i 1 yap
+02B1 1202DC          170    lcall datataken             ; konuþmacýya data alýndý bilgisi gönder
+02B4 22              171    ret;
+                     172    
+02B5                 173    next1x:
+02B5 B43F06          174    cjne a, #unl, next2x        ;
+02B8 C208            175    clr ismyadd                 ;
+02BA 1202DC          176    lcall datataken             ;
+02BD 22              177    ret;                        ;
+                     178    
+02BE                 179    next2x:
+02BE 1202DC          180    lcall datataken             ; Adres doðrulanmadý
+02C1 22              181    ret;                        ;
+                     182    
+                     183    
+                     184    
+                     185    
+02C2                 186    setlistener:                ;---------------------------------------------
+02C2 C2B5            187    clr dr160                   ;
+02C4 C2B4            188    clr e160                   ;
+02C6 C2B7            189    clr te161                   ;
+02C8 D2B6            190    setb dc161                  ;    
+02CA 120424          191    lcall bekle1                ;                                
+02CD C2A2            192    clr  ndac                   ; data not accepted                  Dinleme özelliði için gerek
+                                                                               li ayarlamalarý yap
+02CF D2A3            193    setb nrfd                   ; ready for data
+02D1 D2A7            194    setb srq                    ; not service request
+02D3 D2A5            195    setb eoi                    ; EOI
+02D5 D2A6            196    setb atn                    ; ATN
+02D7 D2A4            197    setb dav                    ; DAV
+02D9 C208            198    clr ismyadd                 ;
+02DB 22              199    ret                         ;---------------------------------------------
+                     200    
+02DC                 201    datataken:
+02DC D2A2            202    setb ndac                   ; data alýndý
+02DE 30A4FB          203    jnb dav, datataken          ; data alýndý onayý için bekle
+02E1 C2A2            204    clr ndac                    ; data alýnamadý
+02E3 D2A3            205    setb nrfd                   ; yeni data almaya hazýr
+02E5 22              206    ret;
+                     207    
+                     208    
+                     209    
+                     210    
+                     211    
+                     212    
+                     213    
+02E6                 214    komutlar:
+                     215    
+02E6 7860            216    mov r0, #commbuf         ; dizinin baþýna dön        
+02E8 E6              217    mov a, @r0               ; ilk karakteri al
+02E9 B45422          218    cjne a, #'T', NotT       ; Ýlk karakter T mi         
+                     219    
+02EC 08              220    inc r0                   ; r0 ý bir arttýrarak 2. karaktere geç
+02ED E6              221    mov a, @r0               ; ikinci karakteri al
+02EE B44F39          222    cjne a, #'O', bitir1  ; ikinci karakter O mu
+                     223    
+GPIBASM                                                                                                       PAGE 5
+
+02F1 08              224    inc r0                   ;
+02F2 E6              225    mov a, @r0               ;
+02F3 B44603          226    cjne a, #'F', notFA      ; üçüncü karakter F mi
+02F6 0203A4          227    jmp off
+                     228    
+02F9                 229    notFA:
+02F9 B44105          230    cjne a, #'A', notAD      ; F deðilse A mý
+02FC D209            231    setb acmidcmi            ;
+02FE 020306          232    jmp atlaal               ;
+                     233    
+0301                 234    notAD:
+0301 B44426          235    cjne a, #'D', bitir1  ; A da deðilse D mi
+0304 C209            236    clr acmidcmi             ;
+0306                 237    atlaal:                  
+                     238    
+0306 08              239    inc r0                   ;
+0307 E6              240    mov a, @r0               ;
+0308 B4431F          241    cjne a, #'C', bitir1  ; son karakter C yse whicbite git ve acmidcmi e bakarak acmi dcmi kara
+                                                                               rver
+030B 0203CB          242    jmp karar;
+                     243    
+                     244    
+030E                 245    NotT:
+030E B4441A          246    cjne a, #'D', NotD ; Ýlk karakter D mi  
+                     247    
+0311 08              248    inc r0;
+0312 E6              249    mov a, @r0;
+0313 B44114          250    cjne a, #'A', bitir1 ; ikinci karakter A mu
+                     251    
+0316 08              252    inc r0;
+0317 E6              253    mov a, @r0;
+0318 B4540F          254    cjne a, #'T', bitir1 ; üçüncü karakter T mu
+                     255    
+031B 08              256    inc r0;
+031C E6              257    mov a, @r0;
+031D B4410A          258    cjne a, #'A', bitir1 ; dördüncü karakter A mu
+                     259    
+0320 08              260    inc r0;
+0321 E6              261    mov a, @r0;
+0322 F590            262    mov outdata,a
+0324 C295            263    clr p1.5
+0326 D296            264    setb p1.6
+0328 C297            265    clr p1.7
+032A                 266    bitir1:
+032A 22              267    ret
+                     268    
+                     269    
+032B                 270    NotD:
+032B B452FC          271    cjne a, #'R', bitir1 ; Ýlk karakter R mi  
+                     272    
+032E 08              273    inc r0;
+032F E6              274    mov a, @r0;
+0330 B44BF7          275    cjne a, #'K', bitir1 ; ikinci karakter K mu
+                     276    
+0333 08              277    inc r0;
+0334 E6              278    mov a, @r0;
+0335 B44EF2          279    cjne a, #'N', bitir1 ; ikinci karakter N mu
+                     280    
+GPIBASM                                                                                                       PAGE 6
+
+0338 08              281    inc r0;
+0339 E6              282    mov a, @r0;
+033A B454ED          283    cjne a, #'T', bitir1 ; ikinci karakter T mu
+                     284                       ;----------------------------------
+033D C295            285    clr p1.5
+033F C296            286    clr p1.6
+0341 C297            287    clr p1.7
+                     288    
+                     289    
+0343 C290            290    clr p1.0
+0345 12042D          291    lcall bekle
+0348 12042D          292    lcall bekle
+034B D290            293    setb p1.0
+                     294    
+034D C291            295    clr p1.1
+034F 12042D          296    lcall bekle
+0352 12042D          297    lcall bekle
+0355 D291            298    setb p1.1
+                     299    
+0357 C290            300    clr p1.0
+0359 C291            301    clr p1.1
+035B 12042D          302    lcall bekle
+035E 12042D          303    lcall bekle
+0361 D290            304    setb p1.0
+0363 D291            305    setb p1.1
+                     306    
+0365 C292            307    clr p1.2
+0367 12042D          308    lcall bekle
+036A 12042D          309    lcall bekle
+036D D292            310    setb p1.2
+                     311    
+036F C290            312    clr p1.0
+0371 C292            313    clr p1.2
+0373 12042D          314    lcall bekle
+0376 12042D          315    lcall bekle
+0379 D290            316    setb p1.0
+037B D292            317    setb p1.2
+                     318    
+037D C291            319    clr p1.1
+037F C292            320    clr p1.2
+0381 12042D          321    lcall bekle
+0384 12042D          322    lcall bekle
+0387 D292            323    setb p1.2
+0389 D291            324    setb p1.1
+                     325    
+038B C290            326    clr p1.0
+038D C291            327    clr p1.1
+038F C292            328    clr p1.2
+0391 12042D          329    lcall bekle
+0394 12042D          330    lcall bekle
+0397 D292            331    setb p1.2
+0399 D291            332    setb p1.1
+039B D290            333    setb p1.0
+                     334    
+                     335    
+                     336    
+                     337    
+039D C210            338    clr offbit ;-------------------
+GPIBASM                                                                                                       PAGE 7
+
+039F C20F            339    clr dcbit  ; bu bitler güvenlik için sýfýrlanýr programýn hiç bi alt programa girmediðin gös
+                                                                               terir
+03A1 C20E            340    clr acbit  ;-------------------
+03A3 22              341    ret                ;----------------------------------
+                     342    
+                     343    
+                     344    
+03A4                 345    off:
+03A4 08              346    inc r0;
+03A5 E6              347    mov a, @r0;
+03A6 B4467A          348    cjne a, #'F', bitir ; eðer üçüncü karakter F ise dördüncü karakterde F'mi kontrol et
+                     349    
+                     350    
+03A9                 351    manoff:                    ;----------------------------------
+03A9 201077          352    jb offbit,bitir       ;off prosedürünün içine arka arkaya girmeyi önler offbit bir ise baþka
+                                                                                bir prosedür çaðrýlana kadar buraa girme
+                                                                               z
+03AC D295            353    setb p1.5
+03AE D296            354    setb p1.6
+03B0 C297            355    clr p1.7
+                     356    
+03B2 C290            357    clr p1.0
+03B4 C291            358    clr p1.1
+03B6 12042D          359    lcall bekle
+03B9 D290            360    setb p1.0
+03BB D291            361    setb p1.1
+                     362    
+03BD C290            363    clr p1.0
+03BF 12042D          364    lcall bekle
+03C2 D290            365    setb p1.0
+                     366    
+03C4 C20E            367    clr acbit
+03C6 D210            368    setb offbit
+03C8 C20F            369    clr dcbit
+                     370    
+03CA 22              371    ret                        ;----------------------------------
+                     372    
+                     373    
+                     374    
+03CB                 375    karar:
+03CB 200929          376    jb acmidcmi,manac
+                     377    
+                     378    
+                     379    
+03CE                 380    mandc:                    ;----------------------------------
+03CE 200F52          381    jb dcbit,bitir
+03D1 D295            382    setb p1.5
+03D3 C296            383    clr p1.6
+03D5 D297            384    setb p1.7
+                     385    
+03D7 C292            386    clr p1.2        ;
+03D9 12042D          387    lcall bekle     ;
+03DC D292            388    setb p1.2       ;
+03DE C291            389    clr p1.1        ;
+03E0 C292            390    clr p1.2        ;
+03E2 12042D          391    lcall bekle     ;               dc ayarlarý
+03E5 D291            392    setb p1.1       ;
+03E7 D292            393    setb p1.2       ;
+GPIBASM                                                                                                       PAGE 8
+
+03E9 C290            394    clr p1.0        ;
+03EB 12042D          395    lcall bekle     ;
+03EE D290            396    setb p1.0       ;
+                     397    
+03F0 C20E            398    clr acbit
+03F2 C210            399    clr offbit
+03F4 D20F            400    setb dcbit
+03F6 22              401    ret                       ;----------------------------------
+                     402    
+                     403    
+                     404    
+03F7                 405    manac:                    ;----------------------------------
+03F7 200E29          406    jb acbit,bitir
+03FA C295            407    clr p1.5
+03FC D296            408    setb p1.6
+03FE D297            409    setb p1.7
+                     410    
+0400 C291            411    clr p1.1
+0402 12042D          412    lcall bekle
+0405 D291            413    setb p1.1
+0407 C290            414    clr p1.0
+0409 C292            415    clr p1.2
+040B 12042D          416    lcall bekle
+040E D290            417    setb p1.0
+0410 D292            418    setb p1.2
+0412 C290            419    clr p1.0
+0414 C291            420    clr p1.1
+0416 12042D          421    lcall bekle
+0419 D290            422    setb p1.0
+041B D291            423    setb p1.1
+                     424    
+041D D20E            425    setb acbit
+041F C210            426    clr offbit
+0421 C20F            427    clr dcbit
+0423                 428    bitir:
+0423 22              429    ret                      ;----------------------------------
+                     430    
+                     431    
+                     432    
+                     433    
+0424                 434    bekle1:                         ;
+0424 8FF0            435    mov b,r7;
+0426 7FFF            436    mov r7,#0ffh                    ;
+0428                 437    bekle2:                         ;
+0428 DFFE            438    djnz r7,bekle2                  ;
+042A AFF0            439    mov r7,b;
+042C 22              440    ret                             ;
+                     441    
+042D                 442    bekle:
+042D 7EFF            443    mov r6,#0ffh;
+042F 7DFF            444    mov r5,#0ffh;
+0431                 445    midd1:
+0431 DDFE            446    djnz r5,midd1;
+0433 DEFC            447    djnz r6,midd1;
+0435 22              448    ret;
+                     449    
+                     450    
+                     451    
+GPIBASM                                                                                                       PAGE 9
+
+                     452    end                                             
+
+VERSION 1.2k ASSEMBLY COMPLETE, 0 ERRORS FOUND
+GPIBASM                                                                                                       PAGE 10
+
+ACBIT. . . . . . . . . . . . . .    NUMB  000EH  
+ACMIDCMI . . . . . . . . . . . .    NUMB  0009H  
+ATLAAL . . . . . . . . . . . . .  C ADDR  0306H  
+ATLANOTMANUEL. . . . . . . . . .  C ADDR  0273H  
+ATN. . . . . . . . . . . . . . .    NUMB  00A6H  
+B. . . . . . . . . . . . . . . .  D ADDR  00F0H  PREDEFINED  
+BEKLE. . . . . . . . . . . . . .  C ADDR  042DH  
+BEKLE1 . . . . . . . . . . . . .  C ADDR  0424H  
+BEKLE2 . . . . . . . . . . . . .  C ADDR  0428H  
+BITIR. . . . . . . . . . . . . .  C ADDR  0423H  
+BITIR1 . . . . . . . . . . . . .  C ADDR  032AH  
+COMMBUF. . . . . . . . . . . . .    NUMB  0060H  
+DATAALINDI . . . . . . . . . . .  C ADDR  02A5H  
+DATATAKEN. . . . . . . . . . . .  C ADDR  02DCH  
+DAV. . . . . . . . . . . . . . .    NUMB  00A4H  
+DC161. . . . . . . . . . . . . .    NUMB  00B6H  
+DCBIT. . . . . . . . . . . . . .    NUMB  000FH  
+DEVAM. . . . . . . . . . . . . .  C ADDR  0265H  
+DEVAM1 . . . . . . . . . . . . .  C ADDR  025FH  
+DR160. . . . . . . . . . . . . .    NUMB  00B5H  
+E160 . . . . . . . . . . . . . .    NUMB  00B4H  
+EOI. . . . . . . . . . . . . . .    NUMB  00A5H  
+FA . . . . . . . . . . . . . . .    NUMB  00B3H  
+FB . . . . . . . . . . . . . . .    NUMB  00B2H  
+GCDATA . . . . . . . . . . . . .    NUMB  00B0H  
+GPDATA . . . . . . . . . . . . .    NUMB  0080H  
+IFC. . . . . . . . . . . . . . .    NUMB  00A1H  NOT USED  
+ISMYADD. . . . . . . . . . . . .    NUMB  0008H  
+ITISCOMMAND. . . . . . . . . . .  C ADDR  02A9H  
+ITISDATA . . . . . . . . . . . .  C ADDR  028EH  
+KARAR. . . . . . . . . . . . . .  C ADDR  03CBH  
+KOMUTLAR . . . . . . . . . . . .  C ADDR  02E6H  
+MAIN . . . . . . . . . . . . . .  C ADDR  024BH  
+MAIN1. . . . . . . . . . . . . .  C ADDR  0289H  
+MANAC. . . . . . . . . . . . . .  C ADDR  03F7H  
+MANDC. . . . . . . . . . . . . .  C ADDR  03CEH  
+MANOFF . . . . . . . . . . . . .  C ADDR  03A9H  
+MIDD1. . . . . . . . . . . . . .  C ADDR  0431H  
+MYADRESS . . . . . . . . . . . .    NUMB  002AH  
+NDAC . . . . . . . . . . . . . .    NUMB  00A2H  
+NEXT1X . . . . . . . . . . . . .  C ADDR  02B5H  
+NEXT2X . . . . . . . . . . . . .  C ADDR  02BEH  
+NOTAD. . . . . . . . . . . . . .  C ADDR  0301H  
+NOTD . . . . . . . . . . . . . .  C ADDR  032BH  
+NOTFA. . . . . . . . . . . . . .  C ADDR  02F9H  
+NOTMANUEL. . . . . . . . . . . .  C ADDR  026BH  
+NOTMANUEL1 . . . . . . . . . . .  C ADDR  027CH  
+NOTT . . . . . . . . . . . . . .  C ADDR  030EH  
+NRFD . . . . . . . . . . . . . .    NUMB  00A3H  
+OFF. . . . . . . . . . . . . . .  C ADDR  03A4H  
+OFFBIT . . . . . . . . . . . . .    NUMB  0010H  
+OTOKONT. . . . . . . . . . . . .    NUMB  0011H  
+OTOKONT1 . . . . . . . . . . . .    NUMB  0012H  NOT USED  
+OTOMAN . . . . . . . . . . . . .    NUMB  00B1H  
+OUTDATA. . . . . . . . . . . . .    NUMB  0090H  
+P0 . . . . . . . . . . . . . . .  D ADDR  0080H  PREDEFINED  
+P1 . . . . . . . . . . . . . . .  D ADDR  0090H  PREDEFINED  
+P2 . . . . . . . . . . . . . . .  D ADDR  00A0H  PREDEFINED  
+GPIBASM                                                                                                       PAGE 11
+
+P3 . . . . . . . . . . . . . . .  D ADDR  00B0H  PREDEFINED  
+RENPIN . . . . . . . . . . . . .    NUMB  00A0H  NOT USED  
+ROLETAK. . . . . . . . . . . . .  C ADDR  0228H  
+ROLETAK1 . . . . . . . . . . . .  C ADDR  0220H  
+SETLISTENER. . . . . . . . . . .  C ADDR  02C2H  
+SRQ. . . . . . . . . . . . . . .    NUMB  00A7H  
+STARTX . . . . . . . . . . . . .  C ADDR  0200H  
+TE161. . . . . . . . . . . . . .    NUMB  00B7H  
+UNL. . . . . . . . . . . . . . .    NUMB  003FH  
